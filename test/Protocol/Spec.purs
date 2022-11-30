@@ -2,8 +2,9 @@ module Stadium.Protocol.Spec where
 
 import Prelude
 
+import Data.Maybe (Maybe(..))
 import Data.Symbol (class IsSymbol)
-import Data.Variant (Variant, inj)
+import Data.Variant (Variant, default, inj, on, prj)
 import Prim.Row (class Cons)
 import Prim.RowList (class RowToList, Cons, Nil, RowList)
 import Record as Record
@@ -65,7 +66,7 @@ class GetState (stm :: StateMachine) sta | stm -> sta
 
 instance GetState (StateMachine_ state x) state
 
----
+-- ---
 
 class GetMsg (stm :: StateMachine) (msg :: Row Type) | stm -> msg
 
@@ -75,7 +76,7 @@ instance
   ) =>
   GetMsg (StateMachine_ x (Protocol_ msgs)) r
 
----
+
 
 class GetMsgRL (msgsRL :: RowList Action) (r :: Row Type) | msgsRL -> r
 
@@ -83,26 +84,40 @@ instance GetMsgRL Nil ()
 
 instance (GetMsgRL rl r', Cons sym a r' r) => GetMsgRL (Cons sym (Action_ a x) rl) r
 
---
+-- --
 
-class GetCases (stm :: StateMachine) (r :: Row Type) | stm -> r
+class GetCases (stm :: StateMachine) (sta :: Type) (cases :: Row Type) (msg :: Row Type) | stm sta -> cases msg where
+  getCases :: Proxy stm -> sta -> Proxy msg -> Record cases -> Variant msg -> Maybe sta
 
 instance
   ( RowToList msgs msgsRL
-  , GetCasesRL msgsRL sta r
+  , GetCasesRL msgsRL sta cases msg
   ) =>
-  GetCases (StateMachine_ sta (Protocol_ msgs)) r
+  GetCases (StateMachine_ sta (Protocol_ msgs)) sta cases msg where
+  getCases stm sta _ cases msg = getCasesRL (Proxy :: _ msgsRL) sta cases msg
 
-class GetCasesRL (msgsRL :: RowList Action) (sta :: Type) (r :: Row Type) | msgsRL sta -> r
+class
+  GetCasesRL (msgsRL :: RowList Action) (sta :: Type) (cases :: Row Type) (msg :: Row Type)
+  | msgsRL sta -> cases msg
+  where
+  getCasesRL :: Proxy msgsRL -> sta -> Record cases -> Variant msg -> Maybe sta
 
-instance GetCasesRL Nil sta ()
+instance GetCasesRL Nil sta () () where
+  getCasesRL _ _ _ _ = Nothing
 
 instance
-  ( GetCasesRL rl sta r'
-  , Cons sym (Unit) r' r
-  --, Cons sym (a -> sta -> sta) r' r
+  ( GetCasesRL rl sta cases' msg'
+  , Cons sym (a -> sta -> sta) cases' cases
+  , Cons sym a msg' msg
+  , IsSymbol sym
   ) =>
-  GetCasesRL (Cons sym (Action_ a x) rl) sta r
+  GetCasesRL (Cons sym (Action_ a x) rl) sta cases msg where
+  getCasesRL _ sta cases msg =
+    ( default Nothing #
+        on (Proxy :: _ sym) (\data_ -> Just $ case' data_ sta)
+    ) msg
+    where
+    case' = Record.get (Proxy :: _ sym) cases
 
 ---
 
@@ -110,35 +125,35 @@ class
   MkReducer (stm :: StateMachine) msg sta cases
   | stm -> msg sta cases
   where
-  mkReducer :: Proxy stm -> cases -> msg -> sta -> sta
+  mkReducer :: Proxy stm -> cases -> msg -> sta -> Maybe sta
 
 instance
-  ( GetMsg stm msg
-  , GetState stm sta
-  , GetCases stm cases
-  , Cons sym msg' msgX msg
-  , Cons sym Unit casesX cases
-  , IsSymbol sym
+  ( GetState stm sta
+  , GetCases stm sta cases msg
   ) =>
   MkReducer stm (Variant msg) sta (Record cases) where
-  mkReducer _ cases msg sta = sta
-    where
-    x :: Unit
-    x = Record.get (Proxy :: _ sym) cases
+  mkReducer _ cases msg sta = getCases (Proxy :: _ stm) sta (Proxy :: _ msg) cases msg
+
+-- where
+-- x :: Unit
+-- x = Record.get (Proxy :: _ sym) cases
 
 ---
+-- forall msg. GetMsg MyStateMachine msg => Variant msg
 
-myReducer :: forall msg. GetMsg MyStateMachine msg => Variant msg -> MyState -> MyState
+-- type T cases msg = GetCases MyStateMachine MyState cases msg => Variant msg
+
+myReducer :: _ -> MyState -> Maybe MyState
 myReducer = mkReducer (Proxy :: _ MyStateMachine)
-  { switchOn: unit -- \(x :: Unit) (st :: MyState) -> st
-  , switchOff: unit -- \(x :: Unit) (st :: MyState) -> st
+  { switchOn: \x st -> st
+  , switchOff: \x st -> st
   }
 
-x :: MyState
+x :: Maybe MyState
 x =
   (inj (Proxy :: _ "off") unit)
     # myReducer (inj (Proxy :: _ "switchOn") unit)
-    # myReducer (inj (Proxy :: _ "switchOff") unit)
+    >>= myReducer (inj (Proxy :: _ "switchOff") unit)
 
 --- Test
 
