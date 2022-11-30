@@ -62,21 +62,19 @@ foreign import data Transition_ :: StatePath -> StatePath -> Transition
 
 ---
 
-class GetState (stm :: StateMachine) sta | stm -> sta
+class GetState (stm :: StateMachine) (sta :: Type) | stm -> sta
 
 instance GetState (StateMachine_ state x) state
 
 -- ---
 
-class GetMsg (stm :: StateMachine) (msg :: Row Type) | stm -> msg
+class GetMsg (ptc :: Protocol) (msg :: Row Type) | ptc -> msg
 
 instance
   ( RowToList msgs msgsRL
   , GetMsgRL msgsRL r
   ) =>
-  GetMsg (StateMachine_ x (Protocol_ msgs)) r
-
-
+  GetMsg (Protocol_ msgs) r
 
 class GetMsgRL (msgsRL :: RowList Action) (r :: Row Type) | msgsRL -> r
 
@@ -86,27 +84,38 @@ instance (GetMsgRL rl r', Cons sym a r' r) => GetMsgRL (Cons sym (Action_ a x) r
 
 -- --
 
-class GetCases (stm :: StateMachine) (sta :: Type) (cases :: Row Type) (msg :: Row Type) | stm sta -> cases msg where
-  getCases :: Proxy stm -> sta -> Proxy msg -> Record cases -> Variant msg -> Maybe sta
+class
+  GetCases
+    (ptc :: Protocol)
+    (sta :: Type)
+    (cases :: Row Type)
+    (msg :: Row Type)
+  | ptc sta msg -> cases where
+  getCases :: Proxy ptc -> sta -> Proxy msg -> Record cases -> Variant msg -> Maybe sta
 
 instance
   ( RowToList msgs msgsRL
   , GetCasesRL msgsRL sta cases msg
   ) =>
-  GetCases (StateMachine_ sta (Protocol_ msgs)) sta cases msg where
+  GetCases (Protocol_ msgs) sta cases msg
+  where
   getCases stm sta _ cases msg = getCasesRL (Proxy :: _ msgsRL) sta cases msg
 
 class
-  GetCasesRL (msgsRL :: RowList Action) (sta :: Type) (cases :: Row Type) (msg :: Row Type)
-  | msgsRL sta -> cases msg
+  GetCasesRL
+    (msgsRL :: RowList Action)
+    (sta :: Type)
+    (cases :: Row Type)
+    (msg :: Row Type)
+  | msgsRL sta msg -> cases
   where
   getCasesRL :: Proxy msgsRL -> sta -> Record cases -> Variant msg -> Maybe sta
 
-instance GetCasesRL Nil sta () () where
+instance GetCasesRL Nil sta () msg where
   getCasesRL _ _ _ _ = Nothing
 
 instance
-  ( GetCasesRL rl sta cases' msg'
+  ( GetCasesRL rl sta cases' msg
   , Cons sym (a -> sta -> sta) cases' cases
   , Cons sym a msg' msg
   , IsSymbol sym
@@ -128,22 +137,16 @@ class
   mkReducer :: Proxy stm -> cases -> msg -> sta -> Maybe sta
 
 instance
-  ( GetState stm sta
-  , GetCases stm sta cases msg
+  ( GetCases ptc sta cases msg
+  , GetMsg ptc msg
   ) =>
-  MkReducer stm (Variant msg) sta (Record cases) where
-  mkReducer _ cases msg sta = getCases (Proxy :: _ stm) sta (Proxy :: _ msg) cases msg
+  MkReducer (StateMachine_ sta ptc) (Variant msg) sta (Record cases)
+  where
+  mkReducer _ cases msg sta = getCases (Proxy :: _ ptc) sta (Proxy :: _ msg) cases msg
 
--- where
--- x :: Unit
--- x = Record.get (Proxy :: _ sym) cases
+--- Test
 
----
--- forall msg. GetMsg MyStateMachine msg => Variant msg
-
--- type T cases msg = GetCases MyStateMachine MyState cases msg => Variant msg
-
-myReducer :: _ -> MyState -> Maybe MyState
+myReducer :: MyMsg -> MyState -> Maybe MyState
 myReducer = mkReducer (Proxy :: _ MyStateMachine)
   { switchOn: \x st -> st
   , switchOff: \x st -> st
@@ -155,11 +158,11 @@ x =
     # myReducer (inj (Proxy :: _ "switchOn") unit)
     >>= myReducer (inj (Proxy :: _ "switchOff") unit)
 
---- Test
-
 type MyStateMachine = StateMachine_ MyState MyProtocol
 
 type MyState = Variant (on :: Unit, off :: Unit)
+
+type MyMsg = Variant (switchOn :: Unit, switchOff :: Unit)
 
 type MyProtocol = Protocol_
   ( switchOn ::
