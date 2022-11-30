@@ -12,10 +12,12 @@ module Test.Readme where
 
 import Prelude
 
+import Data.Maybe (Maybe)
 import Data.Variant (Variant)
 import Data.Variant as V
+import Prim.RowList (Cons, Nil)
+import Stadium (type (>>))
 import Stadium as SD
-import Stadium.Protocol.Spec as Stadium
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 ```
@@ -122,18 +124,11 @@ type Msg'3 = Msg'2
 
 type Protocol'3 :: SD.Protocol
 type Protocol'3 = SD.Protocol_
-  ( switchOff ::
-      SD.Transition_
-        (SD.StatePath_Cases (on :: SD.Case_Leaf))
-        (SD.StatePath_Cases (off :: SD.Case_Leaf))
-
-  , switchOn ::
-      SD.Transition_
-        (SD.StatePath_Cases (off :: SD.Case_Leaf))
-        (SD.StatePath_Cases (on :: SD.Case_Leaf))
+  ( switchOff :: "on" >> "off"
+  , switchOn :: "off" >> "on"
   )
 
-reducer'3 :: Msg'3 -> State'3 -> State'3
+reducer'3 :: Msg'3 -> State'3 -> Maybe State'3
 reducer'3 = SD.mkReducer
   (Proxy :: _ Protocol'3)
   { switchOn: \_ ->
