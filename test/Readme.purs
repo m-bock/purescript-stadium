@@ -1,5 +1,8 @@
+-- Under construction... <img
+-- src="https://media.tenor.com/MRCIli40TYoAAAAi/under-construction90s-90s.gif" width="30">
+-- 
 -- # purescript-stadium
--- Type safe state machines
+-- Type safe state machines 
 --
 -- ## Usage
 -- ### Imports
@@ -11,6 +14,8 @@ import Prelude
 
 import Data.Variant (Variant)
 import Data.Variant as V
+import Stadium as SD
+import Stadium.Protocol.Spec as Stadium
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -35,12 +40,12 @@ reducer'1 msg state = case msg of
 
 -- We could use it like so:
 
-x :: State'1
-x = On
-  # reducer'1 SwitchOff
-  # reducer'1 SwitchOn
+state'1 :: State'1
+state'1 = Off
   # reducer'1 SwitchOn
   # reducer'1 SwitchOff
+  # reducer'1 SwitchOff
+  # reducer'1 SwitchOn
 
 -- What's the problem with this approach? If you look at the reducer function
 -- you'll notice that it's quite easy to introduce mistakes. For instance the
@@ -95,5 +100,52 @@ reducer'2 msg state =
 -- now, it has the same behavior as the one in the ADT example.
 -- First we do an exhaustive pattern match on the incoming message using the
 -- `case_` function. Inside each arm we do a non exhaustive pattern matche on
--- the incoming state providing a default value in case there's no match. 
+-- the incoming state providing a default value in case there's no match. The
+-- injection syntax for variant types is a bit wordy, too. This will be simpler once
+-- PureScript has "visible type application", which as of the time of writing is
+-- being worked on.
+-- To be complete, here's a usage example of this implementation, too:
 
+state'2 :: State'2
+state'2 = V.inj (Proxy :: _ "off") unit
+  # reducer'2 (V.inj (Proxy :: _ "switchOn") unit)
+  # reducer'2 (V.inj (Proxy :: _ "switchOff") unit)
+  # reducer'2 (V.inj (Proxy :: _ "switchOff") unit)
+  # reducer'2 (V.inj (Proxy :: _ "switchOn") unit)
+
+-- ### Increase type safety by using `stadium` 
+-- 
+
+type State'3 = State'2
+
+type Msg'3 = Msg'2
+
+type Protocol'3 :: SD.Protocol
+type Protocol'3 = SD.Protocol_
+  ( switchOff ::
+      SD.Transition_
+        (SD.StatePath_Cases (on :: SD.Case_Leaf))
+        (SD.StatePath_Cases (off :: SD.Case_Leaf))
+
+  , switchOn ::
+      SD.Transition_
+        (SD.StatePath_Cases (off :: SD.Case_Leaf))
+        (SD.StatePath_Cases (on :: SD.Case_Leaf))
+  )
+
+reducer'3 :: Msg'3 -> State'3 -> State'3
+reducer'3 = SD.mkReducer
+  (Proxy :: _ Protocol'3)
+  { switchOn: \_ ->
+      V.case_ #
+        V.onMatch
+          { off: \_ -> V.inj (Proxy :: _ "on") unit
+          }
+  , switchOff: \_ ->
+      V.case_ #
+        V.onMatch
+          { on: \_ -> V.inj (Proxy :: _ "off") unit
+          }
+  }
+
+-- 
