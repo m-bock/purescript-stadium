@@ -1,0 +1,9 @@
+{
+  "name": "purescript-stadium-v2",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "purs-to-md": "https://github.com/thought2/purs-to-md"
+  }
+}
