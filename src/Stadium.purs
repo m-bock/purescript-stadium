@@ -27,7 +27,8 @@ module Stadium
 
 import Prelude
 
-import Data.Maybe (Maybe(..))
+import Control.Alt ((<|>))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Symbol (class IsSymbol)
 import Data.Variant (Variant)
 import Data.Variant as V
@@ -37,6 +38,7 @@ import Prim.RowList (class RowToList, RowList)
 import Prim.RowList as RL
 import Record as Record
 import Type.Proxy (Proxy(..))
+import Unsafe.Coerce (unsafeCoerce)
 
 --- Protocol
 
@@ -154,15 +156,23 @@ instance
   , IsSymbol sym
   , MatchStatePath pathSrc sta staSrc staTgt
   , MatchStatePath pathTgt sta staTgt staSrc
+  , Union cases' cases'x cases
   ) =>
   GetCases (RL.Cons sym (Transition_ pathSrc pathTgt) rl) msg sta cases
   where
-  getCases _ cases msg sta = msg #
-    (V.default Nothing # V.on prop caseHandler)
+  getCases _ cases msg sta =
+    tail <|> head
+
     where
+    tail = getCases (Proxy :: _ rl) (pick cases :: { | cases' }) msg sta
+
+    head = msg #
+      (V.default Nothing # V.on prop caseHandler)
+
     caseHandler data' | Just staSrc <- stateGuard prxPathSrc sta =
       Just $ stateExpand prxPathSrc $ chosenCase data' staSrc
     caseHandler _ = Nothing
+    
     chosenCase = Record.get prop cases
     prop = Proxy :: _ sym
     prxPathSrc = Proxy :: _ pathSrc
@@ -173,7 +183,7 @@ class
   MkReducer (ptc :: Protocol) (msg :: Row Type) (sta :: Type) (cases :: Row Type)
   | ptc msg sta -> cases
   where
-  mkReducer :: Proxy ptc -> Record cases -> Variant msg -> sta -> Maybe sta
+  mkReducer :: Proxy ptc -> Record cases -> Variant msg -> sta -> sta
 
 instance
   ( GetCases transRL msg sta cases
@@ -181,5 +191,11 @@ instance
   ) =>
   MkReducer (Protocol_ trans) msg sta cases
   where
-  mkReducer _ cases msg sta = getCases (Proxy :: _ transRL) cases msg sta
+  mkReducer _ cases msg sta =
+    getCases (Proxy :: _ transRL) cases msg sta
+      # fromMaybe sta
 
+--- Util
+
+pick :: forall r2 rx r1. Union r2 rx r1 => { | r1 } -> { | r2 }
+pick = unsafeCoerce

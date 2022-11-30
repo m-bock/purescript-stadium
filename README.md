@@ -116,19 +116,28 @@ state'2 = V.inj (Proxy :: _ "off") unit
   # reducer'2 (V.inj (Proxy :: _ "switchOn") unit)
 ```
 ### Increase type safety by using `stadium` 
-
+Let's see how we can improve the previous example. We'll use the same state
+and message type.
 ```hs
 type State'3 = State'2
 
 type Msg'3 = Msg'2
-
+```
+However, no we define a Protocol specification for out state machine. It
+indicates that the message "switchOff" is only allowed to turn the state from
+"off" into on. And vice versa for "switchOn".
+Note, that we're using a kind signature here. `SD.Protocol` is the kind of
+this type expression and `SD.Protocol_` it's constructor.
+```hs
 type Protocol'3 :: SD.Protocol
 type Protocol'3 = SD.Protocol_
   ( switchOff :: "on" >> "off"
   , switchOn :: "off" >> "on"
   )
-
-reducer'3 :: Msg'3 -> State'3 -> Maybe State'3
+```
+The reducer is quite similar as the previous one.
+```hs
+reducer'3 :: Msg'3 -> State'3 -> State'3
 reducer'3 = SD.mkReducer
   (Proxy :: _ Protocol'3)
   { switchOn: \_ ->
@@ -141,5 +150,27 @@ reducer'3 = SD.mkReducer
         V.onMatch
           { on: \_ -> V.inj (Proxy :: _ "off") unit
           }
+  }
+```
+We're using the `mkReducer` function to which we provide our protocol via a
+Proxy as the first argument. In the second argument we define the message
+handlers inside a record. Thus we already get the outer pattern matching for
+free. The inner pattern matching is now exhaustive. We can only match on the
+input state that we defined in the protocol for each message. Moreover, the
+return type of each branch is only the state that we defined as output above.
+In other words, for this simple example, even if we tried there would be no
+way to provide a wrong implementation for a case in the reducer.
+
+Of course it is a bit silly to pattern match on a single case, and also to
+inject a case into a variant that has only one case. So we can simplify the
+example by using some helper functions. Later we'll see that those kind of
+one-to-one relations are not always the case, so knowing the verbose syntax
+will be helpful soon.
+```hs
+reducer'3a :: Msg'3 -> State'3 -> State'3
+reducer'3a = SD.mkReducer
+  (Proxy :: _ Protocol'3)
+  { switchOn: \_ -> oneToOne \_ -> unit
+  , switchOff: \_ -> oneToOne \_ -> unit
   }
 ```
