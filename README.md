@@ -143,15 +143,17 @@ The reducer is quite similar as the previous one.
 reducer'3 :: Msg'3 -> State'3 -> State'3
 reducer'3 = SD.mkReducer
   (Proxy :: _ Protocol'3)
-  { switchOn: \_ ->
+  { switchOn: \_ -> -- wildcard for message (unit)
       V.case_ #
         V.onMatch
-          { off: \_ -> V.inj (Proxy :: _ "on") unit
+          { off: \_ -> -- wildcard for state (unit)
+              V.inj (Proxy :: _ "on") unit
           }
   , switchOff: \_ ->
       V.case_ #
         V.onMatch
-          { on: \_ -> V.inj (Proxy :: _ "off") unit
+          { on: \_ ->
+              V.inj (Proxy :: _ "off") unit
           }
   }
 ```
