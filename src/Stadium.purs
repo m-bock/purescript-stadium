@@ -5,25 +5,39 @@ module Stadium
   , Field
   , Field_Cases
   , Field_Fields
+  , Many
+  , Or
   , Protocol
   , Protocol_
-  , SimpleTransitionManyToMany
-  , SimpleTransitionOneToOne
+  , SimpleTransition'ManyToMany
+  , SimpleTransition'ManyToOne
+  , SimpleTransition'OneToMany
+  , SimpleTransition'OneToOne
   , StatePath
   , StatePath_Cases
   , StatePath_Fields
   , Transition
   , Transition_
-  , class MatchStatePath
-  , class GetCases
-  , class MkReducer
   , class FilterRow
-  , mkReducer
-  , type (>>)
+  , class GetCases
+  , class MatchStatePath
+  , class MkReducer
+  , class SingleCaseVariant
+  , fromOne
   , getCases
-  , stateGuard
+  , mkReducer
+  , oneToOne
+  , reSingleCase
   , stateExpand
-  ) where
+  , stateGuard
+  , toOne
+  , type (>>)
+  , type (>>..)
+  , type (||)
+  , unSingleCase
+  , module Exp
+  )
+  where
 
 import Prelude
 
@@ -39,6 +53,8 @@ import Prim.RowList as RL
 import Record as Record
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
+import Stadium.IsoVariant as Exp
+
 
 --- Protocol
 
@@ -81,16 +97,28 @@ type Many (s :: Symbol) = RL.Cons s Case_Leaf RL.Nil
 
 type Or (rl :: RowList Case) (s :: Symbol) = RL.Cons s Case_Leaf rl
 
-infixr 6 type Or as ||
+infixl 7 type Or as ||
 
-infixr 6 type SimpleTransitionOneToOne as >>
+infixr 6 type SimpleTransition'OneToOne as >>
 
-type SimpleTransitionManyToMany (src :: RowList Case) (tgt :: RowList Case) =
+infixr 6 type SimpleTransition'OneToMany as >>..
+
+type SimpleTransition'ManyToMany (src :: RowList Case) (tgt :: RowList Case) =
   Transition_ (StatePath_Cases src) (StatePath_Cases tgt)
 
-type SimpleTransitionOneToOne (src :: Symbol) (tgt :: Symbol) =
-  SimpleTransitionManyToMany
+type SimpleTransition'OneToOne (src :: Symbol) (tgt :: Symbol) =
+  SimpleTransition'ManyToMany
     (RL.Cons src Case_Leaf RL.Nil)
+    (RL.Cons tgt Case_Leaf RL.Nil)
+
+type SimpleTransition'OneToMany (src :: Symbol) (tgt :: RowList Case) =
+  SimpleTransition'ManyToMany
+    (RL.Cons src Case_Leaf RL.Nil)
+    tgt
+
+type SimpleTransition'ManyToOne (src :: RowList Case) (tgt :: Symbol) =
+  SimpleTransition'ManyToMany
+    src
     (RL.Cons tgt Case_Leaf RL.Nil)
 
 --- MatchStatePath
@@ -172,7 +200,7 @@ instance
     caseHandler data' | Just staSrc <- stateGuard prxPathSrc sta =
       Just $ stateExpand prxPathSrc $ chosenCase data' staSrc
     caseHandler _ = Nothing
-    
+
     chosenCase = Record.get prop cases
     prop = Proxy :: _ sym
     prxPathSrc = Proxy :: _ pathSrc
@@ -195,7 +223,38 @@ instance
     getCases (Proxy :: _ transRL) cases msg sta
       # fromMaybe sta
 
---- Util
+--- Internal Util
 
 pick :: forall r2 rx r1. Union r2 rx r1 => { | r1 } -> { | r2 }
 pick = unsafeCoerce
+
+--- SingleCaseVariant
+
+class SingleCaseVariant (r :: Row Type) (a :: Type) | r -> a where
+  unSingleCase :: Variant r -> a
+  reSingleCase :: a -> Variant r
+
+instance
+  ( RowToList r (RL.Cons sym a RL.Nil)
+  , Row.Cons sym a () r
+  , IsSymbol sym
+  ) =>
+  SingleCaseVariant r a where
+  unSingleCase = V.case_ # V.on (Proxy :: _ sym) identity
+  reSingleCase = V.inj (Proxy :: _ sym)
+
+--- Util
+
+toOne :: forall r a b. SingleCaseVariant r a => (b -> a) -> (b -> Variant r)
+toOne f = f >>> reSingleCase
+
+fromOne :: forall r a b. SingleCaseVariant r a => (a -> b) -> (Variant r -> b)
+fromOne f = unSingleCase >>> f
+
+oneToOne
+  :: forall ra rb a b
+   . SingleCaseVariant rb b
+  => SingleCaseVariant ra a
+  => (a -> b)
+  -> (Variant ra -> Variant rb)
+oneToOne = fromOne <<< toOne
