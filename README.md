@@ -12,18 +12,11 @@ module Test.Readme where
 
 import Prelude
 
-import Data.Maybe (Maybe)
 import Data.Variant (Variant)
 import Data.Variant as V
-import Prim.Row as Row
-import Prim.RowList (Cons, Nil)
-import Record as Record
 import Stadium (type (>>), At, Cases)
 import Stadium as SD
-import Stadium.Case (toVariant)
-import Type.Equality (class TypeEquals)
 import Type.Proxy (Proxy(..))
-import Unsafe.Coerce (unsafeCoerce)
 ```
 ### A simple conventional state machine using ADT's
 Let's first look at an example state machine implementation which is done
@@ -110,7 +103,10 @@ First we do an exhaustive pattern match on the incoming message using the
 the incoming state providing a default value in case there's no match. The
 injection syntax for variant types is a bit wordy, too. This will be simpler once
 PureScript has "visible type application", which as of the time of writing is
-being worked on.
+being worked on. Until then, you can use the
+[variant-ctors](https://github.com/thought2/purescript-variant-ctors) package
+to generate constructors.
+
 To be complete, here's a usage example of this implementation, too:
 ```hs
 state'2 :: State'2
@@ -182,6 +178,8 @@ reducer'3a = SD.mkReducer
   }
 ```
 ### Countdown
+Finally let's look at a bit more complex example. Here's the complete code
+for a countdown state machine:
 ```hs
 type State'4 = Variant
   ( idle :: Unit
@@ -195,18 +193,28 @@ type Msg'4 = Variant
   )
 
 type Protocol'4 = SD.Protocol_
-  ( start :: Cases (idle :: At) >> Cases (counting :: At)
-  , countDown :: Cases (counting :: At) >> Cases (counting :: At, zero :: At)
+  ( start ::
+      Cases (idle :: At) >> Cases (counting :: At)
+
+  , countDown ::
+      Cases (counting :: At) >> Cases (counting :: At, zero :: At)
   )
 
 reducer'4 :: Msg'4 -> State'4 -> State'4
 reducer'4 = SD.mkReducer
   (Proxy :: _ Protocol'4)
-  { start: \n -> SD.oneToOne \_ -> n
-  , countDown: \_ -> SD.fromOne \n ->
-      if n == 0 then
-        V.inj (Proxy :: _ "zero") unit
-      else
-        V.inj (Proxy :: _ "counting") (n - 1)
+  { start: \n ->
+      SD.oneToOne \_ -> n
+
+  , countDown: \_ ->
+      SD.fromOne \n ->
+        if n == 0 then
+          V.inj (Proxy :: _ "zero") unit
+        else
+          V.inj (Proxy :: _ "counting") (n - 1)
   }
 ```
+What's new here is that we now have a "countDown" message that goes from one possible state case
+to two possible state cases. That's why we cannot use the the `oneToOne`
+helper in ths reducer. We can only use the `fromOne` helper to eliminate the
+single case variant input.

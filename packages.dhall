@@ -3,12 +3,3 @@ let upstream =
         sha256:9619da55468363705b888350fdd38735a5e90dab101f8d9193057552c5efccad
 
 in  upstream
-
-  with variant-ctors =
-      { dependencies =
-          [ "prelude", "record", "variant" ]
-      , repo =
-          "https://github.com/thought2/purescript-variant-ctors.git"
-      , version =
-          "main"
-      }

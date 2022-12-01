@@ -18,7 +18,6 @@ module Stadium
   , fromOne
   , getCases
   , mkReducer
-  , module Exp
   , oneToOne
   , reSingleCase
   , stateExpand
@@ -40,7 +39,6 @@ import Prim.Row as Row
 import Prim.RowList (class RowToList, RowList)
 import Prim.RowList as RL
 import Record as Record
-import Stadium.IsoVariant as Exp
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
