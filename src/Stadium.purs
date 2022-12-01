@@ -1,21 +1,13 @@
 module Stadium
-  ( Case
-  , Case_Leaf
-  , Case_StatePath
-  , Field
-  , Field_Cases
-  , Field_Fields
-  , Many
-  , Or
+  ( At
+  , Cases
+  , Fields
   , Protocol
   , Protocol_
-  , SimpleTransition'ManyToMany
-  , SimpleTransition'ManyToOne
-  , SimpleTransition'OneToMany
-  , SimpleTransition'OneToOne
   , StatePath
   , StatePath_Cases
   , StatePath_Fields
+  , StatePath_Leaf
   , Transition
   , Transition_
   , class FilterRow
@@ -26,18 +18,15 @@ module Stadium
   , fromOne
   , getCases
   , mkReducer
+  , module Exp
   , oneToOne
   , reSingleCase
   , stateExpand
   , stateGuard
   , toOne
   , type (>>)
-  , type (>>..)
-  , type (||)
   , unSingleCase
-  , module Exp
-  )
-  where
+  ) where
 
 import Prelude
 
@@ -51,10 +40,9 @@ import Prim.Row as Row
 import Prim.RowList (class RowToList, RowList)
 import Prim.RowList as RL
 import Record as Record
+import Stadium.IsoVariant as Exp
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
-import Stadium.IsoVariant as Exp
-
 
 --- Protocol
 
@@ -66,24 +54,11 @@ foreign import data Protocol_ :: Row Transition -> Protocol
 
 foreign import data StatePath :: Type
 
-foreign import data StatePath_Fields :: RowList Field -> StatePath
+foreign import data StatePath_Fields :: Row StatePath -> StatePath
 
-foreign import data StatePath_Cases :: RowList Case -> StatePath
+foreign import data StatePath_Cases :: Row StatePath -> StatePath
 
---- Field
-
-foreign import data Field :: Type
-
-foreign import data Field_Fields :: Row Field -> Field
-
-foreign import data Field_Cases :: Row Case -> Field
-
---- Case
-foreign import data Case :: Type
-
-foreign import data Case_Leaf :: Case
-
-foreign import data Case_StatePath :: StatePath -> Case
+foreign import data StatePath_Leaf :: StatePath
 
 --- Transition
 
@@ -91,35 +66,15 @@ foreign import data Transition :: Type
 
 foreign import data Transition_ :: StatePath -> StatePath -> Transition
 
---- Syntax
+--- Syntax and Shorthands
 
-type Many (s :: Symbol) = RL.Cons s Case_Leaf RL.Nil
+infixr 6 type Transition_ as >>
 
-type Or (rl :: RowList Case) (s :: Symbol) = RL.Cons s Case_Leaf rl
+type At = StatePath_Leaf
 
-infixl 7 type Or as ||
+type Cases = StatePath_Cases
 
-infixr 6 type SimpleTransition'OneToOne as >>
-
-infixr 6 type SimpleTransition'OneToMany as >>..
-
-type SimpleTransition'ManyToMany (src :: RowList Case) (tgt :: RowList Case) =
-  Transition_ (StatePath_Cases src) (StatePath_Cases tgt)
-
-type SimpleTransition'OneToOne (src :: Symbol) (tgt :: Symbol) =
-  SimpleTransition'ManyToMany
-    (RL.Cons src Case_Leaf RL.Nil)
-    (RL.Cons tgt Case_Leaf RL.Nil)
-
-type SimpleTransition'OneToMany (src :: Symbol) (tgt :: RowList Case) =
-  SimpleTransition'ManyToMany
-    (RL.Cons src Case_Leaf RL.Nil)
-    tgt
-
-type SimpleTransition'ManyToOne (src :: RowList Case) (tgt :: Symbol) =
-  SimpleTransition'ManyToMany
-    src
-    (RL.Cons tgt Case_Leaf RL.Nil)
+type Fields = StatePath_Fields
 
 --- MatchStatePath
 
@@ -136,10 +91,11 @@ class
 
 instance
   ( FilterRow casesRL staGt staLt1
+  , RowToList cases casesRL
   , V.Contractable staGt staLt1
   , Union staLt2 x staGt
   ) =>
-  MatchStatePath (StatePath_Cases casesRL) (Variant staGt) (Variant staLt1) (Variant staLt2)
+  MatchStatePath (StatePath_Cases cases) (Variant staGt) (Variant staLt1) (Variant staLt2)
   where
   stateGuard _ = V.contract
   stateExpand _ = V.expand
@@ -148,7 +104,7 @@ instance
 
 class
   FilterRow
-    (casesRL :: RowList Case)
+    (casesRL :: RowList StatePath)
     (rin :: Row Type)
     (rout :: Row Type)
   | casesRL rin -> rout
@@ -160,7 +116,7 @@ instance
   , Row.Cons sym a rinX rin
   , Row.Cons sym a rout' rout
   ) =>
-  FilterRow (RL.Cons sym Case_Leaf rl) rin rout
+  FilterRow (RL.Cons sym StatePath_Leaf rl) rin rout
 
 --- GetCases
 

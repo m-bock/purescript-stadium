@@ -15,9 +15,13 @@ import Prelude
 import Data.Maybe (Maybe)
 import Data.Variant (Variant)
 import Data.Variant as V
+import Prim.Row as Row
 import Prim.RowList (Cons, Nil)
-import Stadium (type (>>))
+import Record as Record
+import Stadium (type (>>), At, Cases, fromOne, toOne)
 import Stadium as SD
+import Stadium.Case (toVariant)
+import Type.Equality (class TypeEquals)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -100,6 +104,7 @@ reducer'2 msg state =
 -- Above we defined the types using Variants. The `Unit` type is used when a
 -- case does not hold any data. The reducer function looks a bit complex. Right
 -- now, it has the same behavior as the one in the ADT example.
+--
 -- First we do an exhaustive pattern match on the incoming message using the
 -- `case_` function. Inside each arm we do a non exhaustive pattern matche on
 -- the incoming state providing a default value in case there's no match. The
@@ -125,14 +130,16 @@ type Msg'3 = Msg'2
 
 -- However, no we define a Protocol specification for out state machine. It
 -- indicates that the message "switchOff" is only allowed to turn the state from
--- "off" into on. And vice versa for "switchOn".
+-- "off" into on. And vice versa for "switchOn". For now, each entry in the
+-- protocol can be understand as a mapping from state cases to state cases.
+--
 -- Note, that we're using a kind signature here. `SD.Protocol` is the kind of
 -- this type expression and `SD.Protocol_` it's constructor.
 
 type Protocol'3 :: SD.Protocol
 type Protocol'3 = SD.Protocol_
-  ( switchOff :: "on" >> "off"
-  , switchOn :: "off" >> "on"
+  ( switchOff :: Cases (on :: At) >> Cases (off :: At)
+  , switchOn :: Cases (off :: At) >> Cases (on :: At)
   )
 
 -- The reducer is quite similar as the previous one.
@@ -170,6 +177,41 @@ reducer'3 = SD.mkReducer
 reducer'3a :: Msg'3 -> State'3 -> State'3
 reducer'3a = SD.mkReducer
   (Proxy :: _ Protocol'3)
-  { switchOn: \_ -> oneToOne \_ -> unit
-  , switchOff: \_ -> oneToOne \_ -> unit
+  { switchOn: \_ -> SD.oneToOne \_ -> unit
+  , switchOff: \_ -> SD.oneToOne \_ -> unit
   }
+
+-- ### Countdown
+
+type State'4 = Variant
+  ( idle :: Unit
+  , counting :: Int
+  , zero :: Unit
+  )
+
+type Msg'4 = Variant
+  ( start :: Int
+  , countDown :: Unit
+  )
+
+type Protocol'4 = SD.Protocol_
+  ( start ::
+      Cases (idle :: At) >> Cases (counting :: At)
+  , countDown ::
+      Cases (counting :: At) >> Cases (counting :: At, zero :: At)
+  )
+
+reducer'4 :: Msg'4 -> State'4 -> State'4
+reducer'4 = SD.mkReducer
+  (Proxy :: _ Protocol'4)
+  { start: \n ->
+      (toOne >>> fromOne) \_ -> n
+
+  , countDown: \_ ->
+      fromOne \n ->
+        if n == 0 then
+          V.inj (Proxy :: _ "zero") unit
+        else
+          V.inj (Proxy :: _ "counting") (n - 1)
+  }
+
