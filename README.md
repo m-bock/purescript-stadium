@@ -6,7 +6,7 @@ Type safe state machines
 
 ## Usage
 ### Imports
-We'll need those imports for the following samples: 
+We'll need those imports for the following examples: 
 ```hs
 module Test.Readme where
 
@@ -21,8 +21,8 @@ import Type.Proxy (Proxy(..))
 ### A simple conventional state machine using ADT's
 Let's first look at an example state machine implementation which is done
 without any extra library.
-It consists of type for the state, a type for a Message and a reducer
-function that is capable to produce new states.
+It consists of a type for the state, a type for a message and a reducer
+function that is can produce new states.
 ```hs
 data State'1 = On | Off
 
@@ -50,12 +50,12 @@ What's the problem with this approach? If you look at the reducer function
 you'll notice that it's quite easy to introduce mistakes. For instance the
 `SwitchOn` handler could mistakenly return the `Off` state. The types are not
 strict enough to prevent this. It may look silly in this simple example but
-state machines can become quite large. And then it will be quite useful to
+state machines can become quite large. And then it will be useful to
 have types that describe the protocol of a state machine more accurately. 
 
 ### A state machine with Variant types
-Before we move to the first example, let's quickly redefine the same machine
-with powerful alternative called [variant
+Before we move to the first example for this library, let's quickly redefine the same machine
+with a powerful sum type alternative called [variant
 types](https://github.com/natefaubion/purescript-variant). I recommend to get
 familiar with this library by reading its README. We'll see later that we
 don't necessarily need to use Variant types in our state type. However,
@@ -99,8 +99,8 @@ case does not hold any data. The reducer function looks a bit complex. Right
 now, it has the same behavior as the one in the ADT example.
 
 First we do an exhaustive pattern match on the incoming message using the
-`case_` function. Inside each arm we do a non exhaustive pattern matche on
-the incoming state providing a default value in case there's no match. The
+`case_` function. Inside each arm we do a non exhaustive pattern match on
+the incoming state providing a default value as fallback. The
 injection syntax for variant types is a bit wordy, too. This will be simpler once
 PureScript has "visible type application", which as of the time of writing is
 being worked on. Until then, you can use the
@@ -124,21 +124,17 @@ type State'3 = State'2
 
 type Msg'3 = Msg'2
 ```
-However, no we define a Protocol specification for out state machine. It
+However, now we define a protocol specification for our state machine. It
 indicates that the message "switchOff" is only allowed to turn the state from
-"off" into on. And vice versa for "switchOn". For now, each entry in the
+"off" into "on". And vice versa for "switchOn". For now, each entry in the
 protocol can be understand as a mapping from state cases to state cases.
-
-Note, that we're using a kind signature here. `SD.Protocol` is the kind of
-this type expression and `SD.Protocol_` it's constructor.
 ```hs
-type Protocol'3 :: SD.Protocol
 type Protocol'3 = SD.Protocol_
   ( switchOff :: Cases (on :: At) >> Cases (off :: At)
   , switchOn :: Cases (off :: At) >> Cases (on :: At)
   )
 ```
-The reducer is quite similar as the previous one.
+The reducer is quite similar as the previous one but it has an important difference.
 ```hs
 reducer'3 :: Msg'3 -> State'3 -> State'3
 reducer'3 = SD.mkReducer
