@@ -49,7 +49,7 @@ mergeStatePath x y =
     StatePath_Cases xs, StatePath_Cases ys -> StatePath_Cases <$> mergeStatePaths xs ys
     StatePath_Fields xs, StatePath_Fields ys -> StatePath_Fields <$> mergeStatePaths xs ys
     StatePath_Leaf, o -> Just o
-    o, StatePath_Leaf -> Just $ o
+    o, StatePath_Leaf -> Just o
     _, _ -> Nothing
 
 mergeStatePaths :: StrMap StatePath -> StrMap StatePath -> Maybe (StrMap StatePath)

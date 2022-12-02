@@ -46,6 +46,7 @@
             pkgs.just
             pkgs.yarn
             pkgs.zephyr
+            pkgs.graphviz
           ];
         };
       }
