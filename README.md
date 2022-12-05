@@ -8,41 +8,16 @@ Type safe state machines
 ### Imports
 We'll need those imports for the following examples: 
 ```hs
-module Test.Readme
-  ( Msg'1(..)
-  , Msg'2
-  , Msg'3
-  , Msg'4
-  , Protocol'3
-  , Protocol'4
-  , State'1(..)
-  , State'2
-  , State'3
-  , State'4
-  , reducer'1
-  , reducer'2
-  , reducer'3
-  , reducer'3a
-  , reducer'4
-  , state'1
-  , state'2
-  ) where
+module Test.Readme where
 
 import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
-import Data.Traversable (scanl)
-import Data.Tuple (fst, snd)
-import Data.Tuple.Nested (type (/\), (/\))
 import Data.Variant (Variant)
 import Data.Variant as V
 import Stadium (type (>>), At, Cases)
 import Stadium as SD
-import Stadium.Testing (type (>>?), testReducer, (>>?))
-import Stadium.Testing as Stadium.Testing
-import Test.Spec (Spec, describe, it)
-import Test.Spec.Assertions (shouldEqual)
 import Type.Proxy (Proxy(..))
 ```
 ### A simple conventional state machine using ADT's
