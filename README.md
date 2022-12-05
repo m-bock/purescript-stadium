@@ -16,8 +16,16 @@ import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Data.Variant (Variant)
 import Data.Variant as V
+import Effect (Effect)
+import Node.ChildProcess as CP
+import Node.Encoding as Enc
+import Node.FS.Sync as FS
+import Node.Path (FilePath)
 import Stadium (type (>>), At, Cases)
 import Stadium as SD
+import Stadium.DotGraph as SD.G
+import Stadium.Reflection (Proxy3(..), ValidProtocol)
+import Stadium.Reflection as SD.R
 import Type.Proxy (Proxy(..))
 ```
 ### A simple conventional state machine using ADT's
@@ -235,4 +243,44 @@ helper in ths reducer. We can only use the `fromOne` helper to eliminate the
 single case variant input.
 ```hs
 
+```
+### Generating state diagrams
+
+You may have wondered how the graphs of the state diagrams have been created.
+The advantage of the approach of making the protocol of the state machine
+explicit is that we can turn this information into other representations.
+This would not have been possible in the conventional ADT example because all
+the wiring is implicitly defined inside the reducer function and there is no
+way to access this data from the outside.
+
+The stadium library includes a simple [graphiz](https://graphviz.org/) dot file renderer.
+In our case we want to turn a valid state machine protocol into both a ".dot"
+file and a ".svg" file.
+
+For this purpose we define the following helper function: 
+```hs
+writeGraphFiles :: FilePath -> String -> ValidProtocol -> Effect Unit
+writeGraphFiles dir name ptc = do
+  let
+    pathDot = dir <> "/" <> name <> "." <> "dot"
+    pathSvg = dir <> "/" <> name <> "." <> "svg"
+
+  SD.G.toDotGraph ptc
+    # SD.G.toText
+    # FS.writeTextFile Enc.UTF8 pathDot
+
+  void $ CP.spawn "dot" [ "-Tsvg", pathDot, "-o", pathSvg ]
+    CP.defaultSpawnOptions
+```
+Which we can now use like so:
+```hs
+sampleMain :: Effect Unit
+sampleMain = do
+  (Proxy3 :: _ Protocol'3 Msg'3 State'3)
+    # SD.R.mkValidProtocol
+    # writeGraphFiles "assets" "state-3"
+
+  (Proxy3 :: _ Protocol'4 Msg'4 State'4)
+    # SD.R.mkValidProtocol
+    # writeGraphFiles "assets" "state-4"
 ```
