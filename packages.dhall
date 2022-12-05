@@ -17,5 +17,5 @@ in  upstream
            , "strings"
            ]
         , repo = "https://github.com/thought2/purescript-dotlang.git"
-        , version = "subgraph-id"
+        , version = "05966e1d33ebd452856ea21a9de943b5e5a330f0"
         }

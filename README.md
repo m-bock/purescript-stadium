@@ -8,14 +8,41 @@ Type safe state machines
 ### Imports
 We'll need those imports for the following examples: 
 ```hs
-module Test.Readme where
+module Test.Readme
+  ( Msg'1(..)
+  , Msg'2
+  , Msg'3
+  , Msg'4
+  , Protocol'3
+  , Protocol'4
+  , State'1(..)
+  , State'2
+  , State'3
+  , State'4
+  , reducer'1
+  , reducer'2
+  , reducer'3
+  , reducer'3a
+  , reducer'4
+  , state'1
+  , state'2
+  ) where
 
 import Prelude
 
+import Data.Generic.Rep (class Generic)
+import Data.Show.Generic (genericShow)
+import Data.Traversable (scanl)
+import Data.Tuple (fst, snd)
+import Data.Tuple.Nested (type (/\), (/\))
 import Data.Variant (Variant)
 import Data.Variant as V
 import Stadium (type (>>), At, Cases)
 import Stadium as SD
+import Stadium.Testing (type (>>?), testReducer, (>>?))
+import Stadium.Testing as Stadium.Testing
+import Test.Spec (Spec, describe, it)
+import Test.Spec.Assertions (shouldEqual)
 import Type.Proxy (Proxy(..))
 ```
 ### A simple conventional state machine using ADT's
@@ -23,10 +50,17 @@ Let's first look at an example state machine implementation which is done
 without any extra library.
 It consists of a type for the state, a type for a message and a reducer
 function that is can produce new states.
+
 ```hs
 data State'1 = On | Off
 
 data Msg'1 = SwitchOn | SwitchOff
+
+derive instance Generic State'1 _
+derive instance Eq State'1
+
+instance Show State'1 where
+  show = genericShow
 
 reducer'1 :: Msg'1 -> State'1 -> State'1
 reducer'1 msg state = case msg of
@@ -119,6 +153,9 @@ state'2 = V.inj (Proxy :: _ "off") unit
 ### Increase type safety by using `stadium` 
 Let's see how we can improve the previous example. We'll use the same state
 and message type.
+
+<img src="assets/state-3.svg"/>
+
 ```hs
 type State'3 = State'2
 
@@ -140,9 +177,11 @@ reducer'3 :: Msg'3 -> State'3 -> State'3
 reducer'3 = SD.mkReducer
   (Proxy :: _ Protocol'3)
   { switchOn: \_ -> -- wildcard for message (unit)
+
       V.case_ #
         V.onMatch
           { off: \_ -> -- wildcard for state (unit)
+
               V.inj (Proxy :: _ "on") unit
           }
   , switchOff: \_ ->
@@ -176,6 +215,9 @@ reducer'3a = SD.mkReducer
   }
 ```
 ### Countdown
+
+<img src="assets/state-4.svg"/>
+
 Finally let's look at a bit more complex example. Here's the complete code
 for a countdown state machine:
 ```hs
@@ -216,3 +258,6 @@ What's new here is that we now have a "countDown" message that goes from one pos
 to two possible state cases. That's why we cannot use the the `oneToOne`
 helper in ths reducer. We can only use the `fromOne` helper to eliminate the
 single case variant input.
+```hs
+
+```
