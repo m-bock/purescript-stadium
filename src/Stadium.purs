@@ -162,16 +162,16 @@ instance
 --- MkReducer
 
 class
-  MkReducer (ptc :: Protocol) (msg :: Row Type) (sta :: Type) (cases :: Row Type)
+  MkReducer (ptc :: Protocol) (msg :: Type) (sta :: Type) (cases :: Row Type)
   | ptc msg sta -> cases
   where
-  mkReducer :: Proxy ptc -> Record cases -> Variant msg -> sta -> sta
+  mkReducer :: Proxy ptc -> Record cases -> msg -> sta -> sta
 
 instance
   ( GetCases transRL msg sta cases
   , RowToList trans transRL
   ) =>
-  MkReducer (Protocol_ trans) msg sta cases
+  MkReducer (Protocol_ trans) (Variant msg) sta cases
   where
   mkReducer _ cases msg sta =
     getCases (Proxy :: _ transRL) cases msg sta

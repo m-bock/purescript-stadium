@@ -14,11 +14,13 @@ import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 import Type.Proxy (Proxy(..))
 
-spec :: Spec Unit
-spec = do
-  describe "StatePath" do
-    describe "Leaf" do
-      it "reflects to a data type" do
-        txt <- readTextFile UTF8 "test/golden/one.dot"
-        (DG.toDotGraph (SDR.Protocol_ Map.empty) # Dot.toText) `shouldEqual` txt
+spec = pure unit
+
+-- spec :: Spec Unit
+-- spec = do
+--   describe "StatePath" do
+--     describe "Leaf" do
+--       it "reflects to a data type" do
+--         txt <- readTextFile UTF8 "test/golden/one.dot"
+--         (DG.toDotGraph (SDR.Protocol_ Map.empty) # Dot.toText) `shouldEqual` txt
 
