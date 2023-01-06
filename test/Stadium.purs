@@ -2,10 +2,11 @@ module Test.Stadium where
 
 import Prelude
 
-import Data.Either (Either)
+import Data.Generic.Rep (class Generic)
 import Data.Variant (Variant)
-import Stadium (class ValidProtocol, type (>>), Cases, Protocol, Protocol_, At)
+import Stadium (class ValidProtocol, type (>>), At, Cases, Protocol, Protocol_, Fields)
 import Type.Proxy (Proxy(..))
+import VariantLike (class GenericVariantLike, class VariantLike, genericFromVariant, genericToVariant)
 
 ---
 isValidProtocol
@@ -46,27 +47,75 @@ test1 = isValidProtocol
            )
   )
 
+test2 :: Unit
+test2 = isValidProtocol
+  ( Proxy
+      :: _
+           ( Protocol_
+               ( msg1 :: Cases () >> Cases ()
+               , msg2 :: Cases () >> Cases ()
+               )
+           )
+  )
+  ( Proxy
+      :: _
+           ( Variant
+               ( msg1 :: String
+               , msg2 :: String
+               )
+           )
+  )
+  ( Proxy
+      :: _
+           ( Variant
+               ( a :: Int
+               , b :: String
+               )
+           )
+  )
+
 ---
 
--- type Msg = Either Unit Unit
+data Msg = Msg1 -- | Msg2 | Msg3
 
--- type State = Either String Int
+derive instance Generic Msg _
 
--- test2 :: Unit
--- test2 = isValidProtocol
---   ( Proxy
---       :: _
---            ( Protocol_
---                ( msg1 :: Cases () >> Cases ()
---                , msg2 :: Cases () >> Cases ()
---                )
---            )
---   )
---   ( Proxy
---       :: _
---            Msg
---   )
---   ( Proxy
---       :: _
---            State
---   )
+instance (GenericVariantLike Msg r) => VariantLike Msg r where
+  toVariant = genericToVariant
+  fromVariant = genericFromVariant
+
+data State = State1 | State2
+
+type State' = { bla :: Boolean, sub :: State }
+
+derive instance Generic State _
+
+instance (GenericVariantLike State r) => VariantLike State r where
+  toVariant = genericToVariant
+  fromVariant = genericFromVariant
+
+test3 :: Unit
+test3 = isValidProtocol
+  ( Proxy
+      :: _
+           ( Protocol_
+               ( "Msg1" ::
+                   Fields
+                     ( sub :: Cases ("State1" :: At)
+                     , bla :: Cases ("true" :: At)
+                     )
+                     >>
+                       Fields
+                         ( sub :: Cases ("State1" :: At)
+                         )
+               )
+           )
+  )
+  ( Proxy
+      :: _
+           Msg
+  )
+  ( Proxy
+      :: _
+           State'
+  )

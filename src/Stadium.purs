@@ -38,7 +38,9 @@ import Prim.Row (class Union)
 import Prim.Row as Row
 import Prim.RowList (class RowToList, RowList)
 import Prim.RowList as RL
+import RecordLike (class RecordLike)
 import Type.Proxy (Proxy(..))
+import VariantLike (class VariantLike)
 
 --- Protocol
 
@@ -105,8 +107,9 @@ class
 instance
   ( RowToList trans transRL
   , ValidProtocolRL transRL msg sta
+  , VariantLike msg_ msg
   ) =>
-  ValidProtocol (Protocol_ trans) (Variant msg) sta
+  ValidProtocol (Protocol_ trans) msg_ sta
 
 ---
 
@@ -142,14 +145,16 @@ class ValidStatePath (sp :: StatePath) (sta :: Type) | sp -> sta
 instance
   ( RowToList cases casesRL
   , ValidStatePathRL casesRL sta
+  , VariantLike sta_ sta
   ) =>
-  ValidStatePath (StatePath_Cases cases) (Variant sta)
+  ValidStatePath (StatePath_Cases cases) sta_
 
 instance
-  ( RowToList cases casesRL
-  , ValidStatePathRL casesRL sta
+  ( RowToList fields fieldsRL
+  , ValidStatePathRL fieldsRL sta
+  , RecordLike sta_ sta
   ) =>
-  ValidStatePath (StatePath_Fields xs) (Record sta)
+  ValidStatePath (StatePath_Fields fields) sta_
 
 instance
   ValidStatePath StatePath_Leaf sta
