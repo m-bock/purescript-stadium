@@ -23,6 +23,7 @@ import Node.FS.Sync as FS
 import Node.Path (FilePath)
 import Stadium (type (>>), At, Cases)
 import Stadium as SD
+import Stadium.Controllers.Pure as SDP
 import Stadium.DotGraph as SD.G
 import Stadium.Reflection (Proxy3(..), ValidProtocol)
 import Stadium.Reflection as SD.R
@@ -157,7 +158,7 @@ type Protocol'3 = SD.Protocol_
 The reducer is quite similar as the previous one but it has an important difference.
 ```hs
 reducer'3 :: Msg'3 -> State'3 -> State'3
-reducer'3 = SD.mkReducer
+reducer'3 = SDP.mkReducer
   (Proxy :: _ Protocol'3)
   { switchOn: \_ -> -- wildcard for message (unit)
 
@@ -191,7 +192,7 @@ one-to-one relations are not always the case, so knowing the verbose syntax
 will be helpful soon.
 ```hs
 reducer'3a :: Msg'3 -> State'3 -> State'3
-reducer'3a = SD.mkReducer
+reducer'3a = SDP.mkReducer
   (Proxy :: _ Protocol'3)
   { switchOn: \_ -> SD.oneToOne \_ -> unit
   , switchOff: \_ -> SD.oneToOne \_ -> unit
@@ -224,7 +225,7 @@ type Protocol'4 = SD.Protocol_
   )
 
 reducer'4 :: Msg'4 -> State'4 -> State'4
-reducer'4 = SD.mkReducer
+reducer'4 = SDP.mkReducer
   (Proxy :: _ Protocol'4)
   { start: \n ->
       SD.oneToOne \_ -> n

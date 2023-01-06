@@ -3,8 +3,7 @@ module Stadium.Testing
   , MsgToState(..)
   , testReducer
   , type (>>?)
-  )
-  where
+  ) where
 
 import Prelude
 

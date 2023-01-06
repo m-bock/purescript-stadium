@@ -11,13 +11,14 @@ module Stadium
   , Transition
   , Transition_
   , class FilterRow
-  , class GetCases
   , class MatchStatePath
-  , class MkReducer
   , class SingleCaseVariant
+  , class ValidProtocol
+  , class ValidProtocolRL
+  , class ValidStatePath
+  , class ValidStatePathRL
+  , class ValidTransition
   , fromOne
-  , getCases
-  , mkReducer
   , oneToOne
   , reSingleCase
   , stateExpand
@@ -29,8 +30,7 @@ module Stadium
 
 import Prelude
 
-import Control.Alt ((<|>))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe)
 import Data.Symbol (class IsSymbol)
 import Data.Variant (Variant)
 import Data.Variant as V
@@ -38,9 +38,7 @@ import Prim.Row (class Union)
 import Prim.Row as Row
 import Prim.RowList (class RowToList, RowList)
 import Prim.RowList as RL
-import Record as Record
 import Type.Proxy (Proxy(..))
-import Unsafe.Coerce (unsafeCoerce)
 
 --- Protocol
 
@@ -98,6 +96,77 @@ instance
   stateGuard _ = V.contract
   stateExpand _ = V.expand
 
+--- ValidProtocol
+
+class
+  ValidProtocol (ptc :: Protocol) (msg :: Type) (sta :: Type)
+  | ptc -> msg sta
+
+instance
+  ( RowToList trans transRL
+  , ValidProtocolRL transRL msg sta
+  ) =>
+  ValidProtocol (Protocol_ trans) (Variant msg) sta
+
+---
+
+class
+  ValidProtocolRL (ptc :: RowList Transition) (msg :: Row Type) (sta :: Type)
+  | ptc -> msg sta
+
+instance ValidProtocolRL RL.Nil () sta
+
+instance
+  ( Row.Cons s t' msg' msg
+  , ValidProtocolRL rl msg' sta
+  , ValidTransition t sta
+  ) =>
+  ValidProtocolRL (RL.Cons s t rl) msg sta
+
+--- 
+
+class
+  ValidTransition (trans :: Transition) (sta :: Type)
+  | trans -> sta
+
+instance
+  ( ValidStatePath sp1 sta
+  , ValidStatePath sp2 sta
+  ) =>
+  ValidTransition (Transition_ sp1 sp2) sta
+
+--
+
+class ValidStatePath (sp :: StatePath) (sta :: Type) | sp -> sta
+
+instance
+  ( RowToList cases casesRL
+  , ValidStatePathRL casesRL sta
+  ) =>
+  ValidStatePath (StatePath_Cases cases) (Variant sta)
+
+instance
+  ( RowToList cases casesRL
+  , ValidStatePathRL casesRL sta
+  ) =>
+  ValidStatePath (StatePath_Fields xs) (Record sta)
+
+instance
+  ValidStatePath StatePath_Leaf sta
+
+-- 
+
+class ValidStatePathRL (sp :: RowList StatePath) (sta :: Row Type) | sp -> sta
+
+instance ValidStatePathRL RL.Nil sta
+
+instance
+  ( ValidStatePathRL rl sta'
+  , ValidStatePath t t'
+  , Row.Cons s t' sta' sta
+  ) =>
+  ValidStatePathRL (RL.Cons s t rl) sta
+
 --- FilterRow
 
 class
@@ -115,72 +184,6 @@ instance
   , Row.Cons sym a rout' rout
   ) =>
   FilterRow (RL.Cons sym StatePath_Leaf rl) rin rout
-
---- GetCases
-
-class
-  GetCases
-    (trans :: RowList Transition)
-    (msg :: Row Type)
-    (sta :: Type)
-    (cases :: Row Type)
-  | trans sta msg -> cases
-  where
-  getCases :: Proxy trans -> Record cases -> Variant msg -> sta -> Maybe sta
-
-instance GetCases RL.Nil msg sta () where
-  getCases _ _ _ _ = Nothing
-
-instance
-  ( GetCases rl msg sta cases'
-  , Row.Cons sym (a -> staSrc -> staTgt) cases' cases
-  , Row.Cons sym a msg' msg
-  , IsSymbol sym
-  , MatchStatePath pathSrc sta staSrc staTgt
-  , MatchStatePath pathTgt sta staTgt staSrc
-  , Union cases' cases'x cases
-  ) =>
-  GetCases (RL.Cons sym (Transition_ pathSrc pathTgt) rl) msg sta cases
-  where
-  getCases _ cases msg sta =
-    tail <|> head
-
-    where
-    tail = getCases (Proxy :: _ rl) (pick cases :: { | cases' }) msg sta
-
-    head = msg #
-      (V.default Nothing # V.on prop caseHandler)
-
-    caseHandler data' | Just staSrc <- stateGuard prxPathSrc sta =
-      Just $ stateExpand prxPathSrc $ chosenCase data' staSrc
-    caseHandler _ = Nothing
-
-    chosenCase = Record.get prop cases
-    prop = Proxy :: _ sym
-    prxPathSrc = Proxy :: _ pathSrc
-
---- MkReducer
-
-class
-  MkReducer (ptc :: Protocol) (msg :: Type) (sta :: Type) (cases :: Row Type)
-  | ptc msg sta -> cases
-  where
-  mkReducer :: Proxy ptc -> Record cases -> msg -> sta -> sta
-
-instance
-  ( GetCases transRL msg sta cases
-  , RowToList trans transRL
-  ) =>
-  MkReducer (Protocol_ trans) (Variant msg) sta cases
-  where
-  mkReducer _ cases msg sta =
-    getCases (Proxy :: _ transRL) cases msg sta
-      # fromMaybe sta
-
---- Internal Util
-
-pick :: forall r2 rx r1. Union r2 rx r1 => { | r1 } -> { | r2 }
-pick = unsafeCoerce
 
 --- SingleCaseVariant
 

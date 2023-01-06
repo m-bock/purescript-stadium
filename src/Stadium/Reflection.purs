@@ -73,7 +73,7 @@ class MkValidProtocol (ptc :: SD.Protocol) (msg :: Type) (sta :: Type) where
   mkValidProtocol :: Proxy3 ptc msg sta -> ValidProtocol
 
 instance
-  ( SD.MkReducer ptc msg sta cases
+  ( SD.ValidProtocol ptc msg sta
   , ReflectProtocol ptc
   ) =>
   MkValidProtocol ptc msg sta
@@ -101,7 +101,7 @@ mergeStatePath x y =
   case x, y of
     StatePath_Cases xs, StatePath_Cases ys -> StatePath_Cases <$> mergeStatePaths xs ys
     StatePath_Fields xs, StatePath_Fields ys -> StatePath_Fields <$> mergeStatePaths xs ys
-    StatePath_Leaf _ , o -> Just o
+    StatePath_Leaf _, o -> Just o
     o, StatePath_Leaf _ -> Just o
     _, _ -> Nothing
 
@@ -147,6 +147,7 @@ instance Show leaf => Show (StatePath leaf) where
 
 data FnReflectTransition = FnReflectTransition
 
+data FnReflectStatePath :: forall k. k -> Type
 data FnReflectStatePath leaf = FnReflectStatePath (Proxy leaf)
 
 data FnReflectRow v = FnReflectRow v
