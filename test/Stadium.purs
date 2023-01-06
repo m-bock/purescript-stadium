@@ -2,6 +2,7 @@ module Test.Stadium where
 
 import Prelude
 
+import Data.Either (Either)
 import Data.Variant (Variant)
 import Stadium (class ValidProtocol, type (>>), Cases, Protocol, Protocol_, At)
 import Type.Proxy (Proxy(..))
@@ -44,3 +45,28 @@ test1 = isValidProtocol
                )
            )
   )
+
+---
+
+-- type Msg = Either Unit Unit
+
+-- type State = Either String Int
+
+-- test2 :: Unit
+-- test2 = isValidProtocol
+--   ( Proxy
+--       :: _
+--            ( Protocol_
+--                ( msg1 :: Cases () >> Cases ()
+--                , msg2 :: Cases () >> Cases ()
+--                )
+--            )
+--   )
+--   ( Proxy
+--       :: _
+--            Msg
+--   )
+--   ( Proxy
+--       :: _
+--            State
+--   )
