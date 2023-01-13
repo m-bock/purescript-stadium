@@ -1,34 +1,6 @@
 { name = "stadium"
 , dependencies =
-  [ "aff"
-  , "arrays"
-  , "console"
-  , "control"
-  , "dotlang"
-  , "effect"
-  , "foldable-traversable"
-  , "heterogeneous"
-  , "identity"
-  , "lists"
-  , "maybe"
-  , "newtype"
-  , "node-buffer"
-  , "node-child-process"
-  , "node-fs"
-  , "node-fs-aff"
-  , "node-path"
-  , "ordered-collections"
-  , "pairs"
-  , "partial"
-  , "prelude"
-  , "record"
-  , "spec"
-  , "strings"
-  , "tuples"
-  , "typelevel-prelude"
-  , "unsafe-coerce"
-  , "variant"
-  ]
+  [ "aff", "data-slices", "effect", "prelude", "spec", "variant" ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
 }

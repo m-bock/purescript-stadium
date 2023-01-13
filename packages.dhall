@@ -19,3 +19,36 @@ in  upstream
         , repo = "https://github.com/thought2/purescript-dotlang.git"
         , version = "05966e1d33ebd452856ea21a9de943b5e5a330f0"
         }
+
+  with
+    data-slices = 
+        { dependencies = 
+        [ "aff"
+        , "effect"
+        , "maybe"
+        , "prelude"
+        , "record"
+        , "reflect-row"
+        , "spec"
+        , "tuples"
+        , "unsafe-coerce"
+        ]
+        , repo = "ssh://git@github.com/thought2/purescript-data-slices.git"
+        , version = "main"
+        }
+
+  with reflect-row =
+      { dependencies =
+        [ "arrays"
+        , "console"
+        , "effect"
+        , "prelude"
+        , "tuples"
+        ]
+      , repo =
+          "https://github.com/thought2/purescript-reflect-row.git"
+      , version =
+          "main"
+      }
+
+
