@@ -1,0 +1,25 @@
+{
+  "name": "purescript-stadium",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/m-bock/purescript-stadium.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/m-bock/purescript-stadium/issues"
+  },
+  "homepage": "https://github.com/m-bock/purescript-stadium#readme",
+  "devDependencies": {
+    "purescript": "^0.15.15",
+    "purs-tidy": "^0.11.0",
+    "spago": "^0.93.44"
+  }
+}
