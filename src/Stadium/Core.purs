@@ -24,8 +24,6 @@ import Effect.Uncurried (EffectFn1, mkEffectFn1)
 import Prim.Row as Row
 import Type.Prelude (Proxy(..))
 
--- Public state
-
 newtype FullState msg pubState privState = FullState
   { pubState :: pubState
   , privState :: privState
