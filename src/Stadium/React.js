@@ -22,13 +22,13 @@ export const useStateMachine = (tsApi) => () => {
   return { state, dispatch };
 };
 
-/** @type {<A>(cb: () => () => void, eq: (a: A, b: A) => boolean, dep: A) => void} */
+/** @type {<A>(cb: () => () => void, eq: (a: A) => (b: A) => boolean, dep: A) => void} */
 export const useEffectEq = (cb, eq, dep) => {
   const prevCount = useRef(0);
   const prevDep = useRef(dep);
 
   prevDep.current = dep;
-  prevCount.current = eq(prevDep.current, dep)
+  prevCount.current = eq(prevDep.current)(dep)
     ? prevCount.current
     : prevCount.current + 1;
 
