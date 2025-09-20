@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from "react";
 
 export const useStateMachine = (tsApi) => () => {
   const [ref, setSt] = useState({ state: tsApi.initState });
+  const [count, setCount] = useState(0);
 
   const tsStateHandle = {
     updateState: (stateFn) => () =>
       setSt((ref) => {
         ref.state = stateFn(ref.state)();
+        setCount(count + 1);
         return { ...ref };
       }),
     readState: () => {
