@@ -4,6 +4,8 @@ import Prelude
 
 import Data.Function.Uncurried (Fn2, mkFn2)
 import Data.Generic.Rep (class Generic, Argument(..), Constructor(..), NoArguments(..), Sum(..), from, to)
+import Effect (Effect)
+import Effect.Uncurried (EffectFn1, mkEffectFn1)
 import Heterogeneous.Mapping (class HMap, class Mapping, hmap)
 import Prim.Row (class Union)
 import Prim.Row as Row
@@ -12,11 +14,26 @@ import Type.Data.Symbol (class IsSymbol)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
+data FnMapToMsgEmitter msg = FnMapToMsgEmitter { emitMsg :: msg -> Effect Unit }
+
+instance Mapping (FnMapToMsgEmitter msg) (arg -> msg) (EffectFn1 arg Unit) where
+  mapping (FnMapToMsgEmitter { emitMsg }) mkMsg = mkEffectFn1 \arg -> emitMsg (mkMsg arg)
+
+mkCtorEmitter
+  :: forall msg rin rout
+   . HMap (FnMapToMsgEmitter msg) (Record rin) (Record rout)
+  => { emitMsg :: msg -> Effect Unit }
+  -> Record rin
+  -> Record rout
+mkCtorEmitter { emitMsg } = hmap (FnMapToMsgEmitter { emitMsg })
+
+--------------------------------------------------------------------------------
+
 class MkConstructors :: Type -> Row Type -> Constraint
 class MkConstructors a r | a -> r where
   mkConstructors :: Record r
 
-instance main ::
+instance
   ( Generic a rep
   , MkConstructorsRep rep r'
   , HMap (FnMapFromRep a) (Record r') (Record r)
@@ -56,7 +73,7 @@ class MkConstructorsRep :: forall k. k -> Row Type -> Constraint
 class MkConstructorsRep rep r | rep -> r where
   mkConstructorsRep :: Record r
 
-instance main2 ::
+instance
   ( MkConstructorsRep lhs lhsr'
   , MkConstructorsRep rhs rhsr'
   , HMap FnMapLeft (Record lhsr') (Record lhsr)
@@ -81,7 +98,7 @@ instance main2 ::
     ret :: Record r
     ret = Record.union lhsr rhsr
 
-instance main6 ::
+instance
   ( Row.Cons sym (Unit -> Constructor sym NoArguments) () r
   , IsSymbol sym
   ) =>
@@ -109,27 +126,37 @@ else instance
 
 data FnMapLeft = FnMapLeft
 
-instance main3 :: Mapping FnMapLeft (args -> a) (args -> Sum a b) where
+instance
+  Mapping FnMapLeft (args -> a) (args -> Sum a b) where
   mapping _ x = Inl <$> x
 
-else instance main34 :: Mapping FnMapLeft a (Sum a b) where
+else instance
+  Mapping FnMapLeft a (Sum a b) where
   mapping _ x = Inl x
 
 data FnMapRight = FnMapRight
 
-instance main35 :: Mapping FnMapRight (args -> b) (args -> Sum a b) where
+instance
+  Mapping FnMapRight (args -> b) (args -> Sum a b) where
   mapping _ x = Inr <$> x
 
-else instance main36 :: Mapping FnMapRight b (Sum a b) where
+else instance
+  Mapping FnMapRight b (Sum a b) where
   mapping _ x = Inr x
 
 data FnMapFromRep :: forall k. k -> Type
 data FnMapFromRep a = FnMapFromRep
 
-instance main55 :: (Generic a rep) => Mapping (FnMapFromRep a) (args -> rep) (args -> a) where
+instance
+  ( Generic a rep
+  ) =>
+  Mapping (FnMapFromRep a) (args -> rep) (args -> a) where
   mapping _ x = to <<< x
 
-else instance main5 :: (Generic a rep) => Mapping (FnMapFromRep a) rep a where
+else instance
+  ( Generic a rep
+  ) =>
+  Mapping (FnMapFromRep a) rep a where
   mapping _ x = to x
 
 ---
@@ -138,14 +165,22 @@ class MkMatcher :: Type -> Row Type -> Type -> Constraint
 class MkMatcher a r z | a -> r where
   mkMatcher :: Fn2 a (Record r) z
 
-instance main7 :: (Generic a rep, MkMatcherRep rep () r z) => MkMatcher a r z where
+instance
+  ( Generic a rep
+  , MkMatcherRep rep () r z
+  ) =>
+  MkMatcher a r z where
   mkMatcher = mkFn2 \val rec -> mkMatcherRep @_ @() @_ @z rec (from val)
 
 class MkMatcher1 :: (Type -> Type) -> Type -> Type -> Row Type -> Constraint
 class MkMatcher1 fa a z r | fa a -> r where
   mkMatcher1 :: Fn2 (fa a) (Record r) z
 
-instance main71 :: (Generic (f a) rep, MkMatcherRep rep () r z) => MkMatcher1 f a z r where
+instance
+  ( Generic (f a) rep
+  , MkMatcherRep rep () r z
+  ) =>
+  MkMatcher1 f a z r where
   mkMatcher1 = mkFn2 \val rec -> mkMatcherRep @rep @() @r @z rec (from val)
 
 class MkMatcherRep :: Type -> Row Type -> Row Type -> Type -> Constraint
@@ -166,7 +201,7 @@ dropFields = unsafeCoerce
 dropFields' :: forall rx r2 r1. (Row.Union rx r2 r1) => Record r1 -> Record r2
 dropFields' = unsafeCoerce
 
-instance main8 ::
+instance
   ( Row.Cons sym (Unit -> z) rin r
   , IsSymbol sym
   ) =>
