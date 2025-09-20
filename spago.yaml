@@ -9,11 +9,6 @@ package:
     - argonaut-core
     - record
     - codec-argonaut
-    # - codec
-    # - variant
-    # - ordered-collections
-    # - type-equality
-    # - foreign-object
 
   test:
     main: Test.Main
