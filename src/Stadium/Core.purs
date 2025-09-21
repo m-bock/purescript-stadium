@@ -5,14 +5,17 @@ module Stadium.Core
   , TsApi(..)
   , TsStateHandle(..)
   , logJson
+  , defaultDebugMsg
   ) where
 
 import Prelude
 
 import Data.Argonaut.Core (Json)
+import Data.Bifunctor (lmap)
 import Data.Codec (encode)
 import Data.Codec.Argonaut as CA
-import Data.Either (Either(..))
+import Data.Codec.Argonaut.Record as CAR
+import Data.Either (Either(..), fromRight)
 import Data.Lens (Lens, over, set)
 import Data.Lens.Record as LensRecord
 import Data.Maybe (Maybe(..), maybe)
@@ -48,8 +51,13 @@ type PursConfig msg pubState privState err disp =
   , initPubState :: pubState
   , initPrivState :: privState
   , encodeJsonPubState :: pubState -> Json
-  , encodeMsg :: msg -> { tag :: String, args :: Json }
+  , encodeMsg :: msg -> Json
+  , debugMsg :: Json -> Either String { tag :: String, values :: Array Json }
   }
+
+defaultDebugMsg :: Json -> Either String { tag :: String, values :: Array Json }
+defaultDebugMsg json = lmap CA.printJsonDecodeError do
+  CA.decode (CAR.object "" { tag: CA.string, values: CA.array CA.json }) json
 
 newtype TsStateHandle state = TsStateHandle
   { updateState :: (state -> Effect state) -> Effect Unit
@@ -69,7 +77,7 @@ derive instance Newtype (TsApi msg pubState state disp) _
 derive instance Newtype (FullState msg pubState privState) _
 
 mkTsApi :: forall msg pubState privState err disp. PursConfig msg pubState privState err disp -> TsApi msg pubState privState disp
-mkTsApi { initPubState, initPrivState, dispatchers, updatePubState, encodeJsonPubState, encodeMsg } =
+mkTsApi { initPubState, initPrivState, dispatchers, updatePubState, encodeJsonPubState, encodeMsg, debugMsg } =
   TsApi
     { dispatchers: mkDispatcherApi >>> dispatchers
     , initState
@@ -105,13 +113,19 @@ mkTsApi { initPubState, initPrivState, dispatchers, updatePubState, encodeJsonPu
             log err
             pure (FullState state)
           Right newState -> do
-            let { tag, args } = encodeMsg msg
+            let
+              json = encodeMsg msg
+              { tag, values } = fromRight { tag: "Unknown", values: [ json ] } (debugMsg json)
+
+              valOrVals = case values of
+                [ val ] -> encode CA.json val
+                vals -> encode (CA.array CA.json) vals
 
             logJson
-              ( [ encode CA.string ("%c" <> tag)
+              ( [ encode CA.string ("%c" <> tag <> maybe "" (\v -> "%c@" <> v) mayCtx)
                 , encode CA.string "color: white; background: #cc8a21; padding: 2px 4px;"
-                ] <> (maybe [] (\v -> [ encode CA.string ("@" <> v) ]) mayCtx) <>
-                  [ args
+                ] <> maybe [] (\v -> [ encode CA.string "color: white; background:rgb(248, 98, 38); padding: 2px 4px;" ]) mayCtx <>
+                  [ valOrVals
                   , encode CA.string "\nnewState"
                   , encodeJsonPubState newState
                   ]
