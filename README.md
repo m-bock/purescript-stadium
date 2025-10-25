@@ -12,4 +12,6 @@ stadium in a nutshell:
 
 1. Write your state machines in **PureScript**
 2. Generate **TypeScript** types for it
-3. Use it as rgular Hook in a **React** app
+3. Use it as regular Hook in a **React** app
+
+See [this project](https://github.com/m-bock/gcode-viewer) as usage example.
