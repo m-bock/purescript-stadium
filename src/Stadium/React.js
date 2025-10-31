@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export const useStateMachine = (tsApi) => () => {
+export const useStateMachineImpl = (tsApi) => () => {
   const [ref, setSt] = useState({ state: tsApi.initState });
   const [count, setCount] = useState(0);
 

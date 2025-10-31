@@ -1,28 +1,30 @@
 module Stadium.Core
-  ( FullState(..)
-  , mkTsApi
-  , DispatcherApi
+  ( DispatcherApi
+  , FullState(..)
+  , PursConfig
+  , PursConfigSimple
   , TsApi(..)
   , TsStateHandle(..)
-  , logJson
   , defaultDebugMsg
+  , defaultPursConfig
+  , fromSimplePursConfig
+  , logJson
+  , mkTsApi
   ) where
 
 import Prelude
 
 import Data.Argonaut.Core (Json)
 import Data.Bifunctor (lmap)
-import Data.Codec (encode)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Record as CAR
-import Data.Either (Either(..), fromRight)
+import Data.Either (Either(..))
 import Data.Lens (Lens, over, set)
 import Data.Lens.Record as LensRecord
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (class IsSymbol)
 import Effect (Effect)
-import Effect.Class.Console (log)
 import Effect.Uncurried (EffectFn1, mkEffectFn1)
 import Prim.Row as Row
 import Type.Prelude (Proxy(..))
@@ -31,7 +33,7 @@ newtype FullState msg pubState privState = FullState
   { pubState :: pubState
   , privState :: privState
   , history :: Array { msg :: msg, pubState :: pubState }
-  , historyIndex :: Number
+  , historyIndex :: Int
   }
 
 type DispatcherApi msg pubState privState =
@@ -42,17 +44,36 @@ type DispatcherApi msg pubState privState =
   , updatePrivState :: (privState -> privState) -> Effect Unit
   }
 
----
-
-type PursConfig msg pubState privState err disp =
-  { updatePubState :: msg -> pubState -> Either String pubState
-  , dispatchers :: DispatcherApi msg pubState privState -> disp
-  , printError :: err -> String
-  , initPubState :: pubState
+type PursConfig msg state privState err disp =
+  { update :: msg -> state -> Either err state
+  , init :: state
+  , dispatchers :: DispatcherApi msg state privState -> disp
   , initPrivState :: privState
-  , encodeJsonPubState :: pubState -> Json
-  , encodeMsg :: msg -> Json
-  , debugMsg :: Json -> Either String { tag :: String, values :: Array Json }
+  , onUpdate :: Maybe String -> Either err state -> Effect Unit
+  }
+
+type PursConfigSimple msg state disp =
+  { update :: msg -> state -> state
+  , init :: state
+  , dispatchers :: DispatcherApi msg state Unit -> disp
+  }
+
+defaultPursConfig :: PursConfig Unit Unit Unit Unit Unit
+defaultPursConfig =
+  { update: \_ state -> Right state
+  , init: unit
+  , dispatchers: \_ -> unit
+  , initPrivState: unit
+  , onUpdate: \_ _ -> pure unit
+  }
+
+fromSimplePursConfig :: forall msg state disp. PursConfigSimple msg state disp -> PursConfig msg state Unit Unit disp
+fromSimplePursConfig cfg =
+  { update: \msg state -> Right (cfg.update msg state)
+  , init: cfg.init
+  , dispatchers: cfg.dispatchers
+  , initPrivState: unit
+  , onUpdate: \_ _ -> pure unit
   }
 
 defaultDebugMsg :: Json -> Either String { tag :: String, values :: Array Json }
@@ -77,9 +98,9 @@ derive instance Newtype (TsApi msg pubState state disp) _
 derive instance Newtype (FullState msg pubState privState) _
 
 mkTsApi :: forall msg pubState privState err disp. PursConfig msg pubState privState err disp -> TsApi msg pubState privState disp
-mkTsApi { initPubState, initPrivState, dispatchers, updatePubState, encodeJsonPubState, encodeMsg, debugMsg } =
+mkTsApi cfg =
   TsApi
-    { dispatchers: mkDispatcherApi >>> dispatchers
+    { dispatchers: mkDispatcherApi >>> cfg.dispatchers
     , initState
     , timeTravel: mkEffectFn1 \n -> pure unit
     }
@@ -87,9 +108,9 @@ mkTsApi { initPubState, initPrivState, dispatchers, updatePubState, encodeJsonPu
   initState :: FullState msg pubState privState
   initState = FullState
     { history: []
-    , historyIndex: 0.0
-    , pubState: initPubState
-    , privState: initPrivState
+    , historyIndex: 0
+    , pubState: cfg.init
+    , privState: cfg.initPrivState
     }
 
   mkDispatcherApi :: TsStateHandle (FullState msg pubState privState) -> DispatcherApi msg pubState privState
@@ -108,36 +129,24 @@ mkTsApi { initPubState, initPrivState, dispatchers, updatePubState, encodeJsonPu
     where
     emitMsg :: Maybe String -> msg -> Effect Unit
     emitMsg mayCtx msg = ts.updateState
-      ( \(FullState state) -> case updatePubState msg state.pubState of
-          Left err -> do
-            log err
-            pure (FullState state)
-          Right newState -> do
-            let
-              json = encodeMsg msg
-              { tag, values } = fromRight { tag: "Unknown", values: [ json ] } (debugMsg json)
+      ( \(FullState state) -> do
+          let
+            result = cfg.update msg state.pubState
 
-              valOrVals = case values of
-                [ val ] -> encode CA.json val
-                vals -> encode (CA.array CA.json) vals
+          cfg.onUpdate mayCtx result
 
-            logJson
-              ( [ encode CA.string ("%c" <> tag <> maybe "" (\v -> "%c@" <> v) mayCtx)
-                , encode CA.string "color: white; background: #cc8a21; padding: 2px 4px;"
-                ] <> maybe [] (\v -> [ encode CA.string "color: white; background:rgb(248, 98, 38); padding: 2px 4px;" ]) mayCtx <>
-                  [ valOrVals
-                  , encode CA.string "\nnewState"
-                  , encodeJsonPubState newState
-                  ]
-              )
+          case result of
+            Left _ -> do
+              pure (FullState state)
+            Right newState -> do
 
-            pure
-              ( state
-                  # set (prop @"pubState") newState
-                  # set (prop @"historyIndex") (state.historyIndex + 1.0)
-                  # over (prop @"history") (\xs -> xs <> [ { msg, pubState: newState } ])
-                  # FullState
-              )
+              pure
+                ( state
+                    # set (prop @"pubState") newState
+                    # set (prop @"historyIndex") (state.historyIndex + 1)
+                    # over (prop @"history") (\xs -> xs <> [ { msg, pubState: newState } ])
+                    # FullState
+                )
       )
 
 ---
