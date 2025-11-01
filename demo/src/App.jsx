@@ -1,4 +1,3 @@
-import './App.css'
 import { useDemoStateMachine } from '../../output/Test.Demo/index.js'
 
 function App() {
