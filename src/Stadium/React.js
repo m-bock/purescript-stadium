@@ -3,24 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 
 export const useStateMachineImpl = (tsApi) => () => {
-  const [ref, setSt] = useState({ state: tsApi.initState });
-  const [count, setCount] = useState(0);
+  const stateRef = useRef(tsApi.initState);
+  const [snap, setSnap] = useState({ state: tsApi.initState });
 
   const tsStateHandle = {
-    updateState: (stateFn) => () =>
-      setSt((ref) => {
-        ref.state = stateFn(ref.state)();
-        setCount(count + 1);
-        return { ...ref };
-      }),
-    readState: () => {
-      return ref.state;
+    updateState: (stateFn) => () => {
+      stateRef.current = stateFn(stateRef.current)();
+      setSnap({ state: stateRef.current });
     },
+    readState: () => stateRef.current,
   };
 
   const dispatch = tsApi.dispatchers(tsStateHandle);
-  const state = ref.state.pubState;
-
+  const state = snap.state.pubState;
   return { state, dispatch };
 };
 
