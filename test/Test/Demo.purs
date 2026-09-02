@@ -25,7 +25,7 @@ type Dispatchers =
   , countDown :: Effect Unit
   }
 
-dispatchers :: Stadium.DispatcherApi Msg State Unit -> Dispatchers
+dispatchers :: Stadium.DispatcherApi Effect Msg State Unit -> Dispatchers
 dispatchers api =
   { countUp: api.emitMsg CountUp
   , countDown: api.emitMsg CountDown
