@@ -12,7 +12,8 @@ package:
 
   test:
     main: Test.Main
-    dependencies: []
+    dependencies:
+      - aff
 workspace:
   packageSet:
     registry: 66.4.0

@@ -25,6 +25,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (class IsSymbol)
 import Effect (Effect)
+import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Uncurried (EffectFn1, mkEffectFn1)
 import Prim.Row as Row
 import Type.Prelude (Proxy(..))
@@ -36,29 +37,32 @@ newtype FullState msg pubState privState = FullState
   , historyIndex :: Int
   }
 
-type DispatcherApi msg pubState privState =
-  { emitMsg :: msg -> Effect Unit
-  , emitMsgCtx :: String -> msg -> Effect Unit
-  , readPubState :: Effect pubState
-  , readPrivState :: Effect privState
-  , updatePrivState :: (privState -> privState) -> Effect Unit
+type DispatcherApi m msg pubState privState =
+  { emitMsg :: msg -> m Unit
+  , emitMsgCtx :: String -> msg -> m Unit
+  , readPubState :: m pubState
+  , readPrivState :: m privState
+  , updatePrivState :: (privState -> privState) -> m Unit
   }
 
-type PursConfig msg state privState err disp =
+type PursConfig m msg state privState err disp =
   { update :: msg -> state -> Either err state
   , init :: state
-  , dispatchers :: DispatcherApi msg state privState -> disp
+  , dispatchers :: DispatcherApi m msg state privState -> disp
   , initPrivState :: privState
+  -- Stays in `Effect`, and has to: this one is *called* by the library,
+  -- from inside React's state updater. Running an arbitrary `m` back to
+  -- `Effect` would need a runner, and there is none to be had here.
   , onUpdate :: Maybe String -> Either err state -> Effect Unit
   }
 
-type PursConfigSimple msg state disp =
+type PursConfigSimple m msg state disp =
   { update :: msg -> state -> state
   , init :: state
-  , dispatchers :: DispatcherApi msg state Unit -> disp
+  , dispatchers :: DispatcherApi m msg state Unit -> disp
   }
 
-defaultPursConfig :: PursConfig Unit Unit Unit Unit Unit
+defaultPursConfig :: forall m. PursConfig m Unit Unit Unit Unit Unit
 defaultPursConfig =
   { update: \_ state -> Right state
   , init: unit
@@ -67,7 +71,7 @@ defaultPursConfig =
   , onUpdate: \_ _ -> pure unit
   }
 
-fromSimplePursConfig :: forall msg state disp. PursConfigSimple msg state disp -> PursConfig msg state Unit Unit disp
+fromSimplePursConfig :: forall m msg state disp. PursConfigSimple m msg state disp -> PursConfig m msg state Unit Unit disp
 fromSimplePursConfig cfg =
   { update: \msg state -> Right (cfg.update msg state)
   , init: cfg.init
@@ -97,7 +101,7 @@ derive instance Newtype (TsApi msg pubState state disp) _
 
 derive instance Newtype (FullState msg pubState privState) _
 
-mkTsApi :: forall msg pubState privState err disp. PursConfig msg pubState privState err disp -> TsApi msg pubState privState disp
+mkTsApi :: forall m msg pubState privState err disp. MonadEffect m => PursConfig m msg pubState privState err disp -> TsApi msg pubState privState disp
 mkTsApi cfg =
   TsApi
     { dispatchers: mkDispatcherApi >>> cfg.dispatchers
@@ -113,18 +117,21 @@ mkTsApi cfg =
     , privState: cfg.initPrivState
     }
 
-  mkDispatcherApi :: TsStateHandle (FullState msg pubState privState) -> DispatcherApi msg pubState privState
+  -- Every field is the `Effect` one lifted. That is the whole trick,
+  -- and the reason this direction is free: the library only ever *hands
+  -- these out*, so it needs to go outward from `Effect` and never back.
+  mkDispatcherApi :: TsStateHandle (FullState msg pubState privState) -> DispatcherApi m msg pubState privState
   mkDispatcherApi (TsStateHandle ts) =
-    { emitMsg: emitMsg Nothing
-    , emitMsgCtx: \ctx -> emitMsg (Just ctx)
-    , readPubState: do
+    { emitMsg: \msg -> liftEffect (emitMsg Nothing msg)
+    , emitMsgCtx: \ctx msg -> liftEffect (emitMsg (Just ctx) msg)
+    , readPubState: liftEffect do
         FullState st <- ts.readState
         pure st.pubState
-    , readPrivState: do
+    , readPrivState: liftEffect do
         FullState st <- ts.readState
         pure st.privState
-    , updatePrivState: \f ->
-        ts.updateState (\(FullState state) -> pure (FullState state { privState = f state.privState }))
+    , updatePrivState: \f -> liftEffect
+        (ts.updateState (\(FullState state) -> pure (FullState state { privState = f state.privState })))
     }
     where
     emitMsg :: Maybe String -> msg -> Effect Unit
