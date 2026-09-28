@@ -40,6 +40,7 @@ newtype FullState msg pubState privState = FullState
 type DispatcherApi m msg pubState privState =
   { emitMsg :: msg -> m Unit
   , emitMsgCtx :: String -> msg -> m Unit
+  , applyMsg :: msg -> m pubState
   , readPubState :: m pubState
   , readPrivState :: m privState
   , updatePrivState :: (privState -> privState) -> m Unit
@@ -122,8 +123,9 @@ mkTsApi cfg =
   -- these out*, so it needs to go outward from `Effect` and never back.
   mkDispatcherApi :: TsStateHandle (FullState msg pubState privState) -> DispatcherApi m msg pubState privState
   mkDispatcherApi (TsStateHandle ts) =
-    { emitMsg: \msg -> liftEffect (emitMsg Nothing msg)
-    , emitMsgCtx: \ctx msg -> liftEffect (emitMsg (Just ctx) msg)
+    { emitMsg: \msg -> liftEffect (void (applyMsg Nothing msg))
+    , emitMsgCtx: \ctx msg -> liftEffect (void (applyMsg (Just ctx) msg))
+    , applyMsg: \msg -> liftEffect (applyMsg Nothing msg)
     , readPubState: liftEffect do
         FullState st <- ts.readState
         pure st.pubState
@@ -134,6 +136,14 @@ mkTsApi cfg =
         (ts.updateState (\(FullState state) -> pure (FullState state { privState = f state.privState })))
     }
     where
+    applyMsg :: Maybe String -> msg -> Effect pubState
+    applyMsg mayCtx msg = do
+      emitMsg mayCtx msg
+
+      FullState now <- ts.readState
+
+      pure now.pubState
+
     emitMsg :: Maybe String -> msg -> Effect Unit
     emitMsg mayCtx msg = ts.updateState
       ( \(FullState state) -> do

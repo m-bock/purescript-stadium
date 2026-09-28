@@ -6,18 +6,25 @@
         "core": {
           "dependencies": [
             "argonaut-core",
+            "bifunctors",
             "codec-argonaut",
-            "console",
             "effect",
+            "either",
+            "functions",
             "heterogeneous",
+            "maybe",
+            "newtype",
             "prelude",
             "profunctor-lenses",
-            "record"
+            "record",
+            "typelevel-prelude",
+            "unsafe-coerce"
           ]
         },
         "test": {
           "dependencies": [
-            "aff"
+            "aff",
+            "console"
           ]
         }
       }

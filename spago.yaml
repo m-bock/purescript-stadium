@@ -1,19 +1,27 @@
 package:
   name: stadium
   dependencies:
-    - console
-    - effect
-    - prelude
-    - heterogeneous
-    - profunctor-lenses
     - argonaut-core
-    - record
+    - bifunctors
     - codec-argonaut
+    - effect
+    - either
+    - functions
+    - heterogeneous
+    - maybe
+    - newtype
+    - prelude
+    - profunctor-lenses
+    - record
+    - typelevel-prelude
+    - unsafe-coerce
 
   test:
     main: Test.Main
     dependencies:
       - aff
+      - console
+
 workspace:
   packageSet:
     registry: 66.4.0
